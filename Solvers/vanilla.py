@@ -25,5 +25,6 @@ class VanillaAlg:
         """
         grad = 0
         dec_cur = dec_prev - self.sz * grad
+        print(dec_cur)
 
         return dec_cur
