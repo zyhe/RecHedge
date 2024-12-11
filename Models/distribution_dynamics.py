@@ -25,7 +25,6 @@ class UserHedge:
         # self.p_init = normalize_simplex(np.ones((dim, 1)))  # uniform initial distribution
         self.p_init = normalize_simplex(np.random.rand(dim, 1))
         self.p_cur = self.p_init
-        self.p_traj_data = None
 
     def per_step_dynamics(self, dec: np.ndarray) -> np.ndarray:
         """
@@ -37,6 +36,10 @@ class UserHedge:
         p_trans = self.p_cur * np.exp(-self.epsilon * dec)
         self.p_cur = self.sigma * normalize_simplex(p_trans) + (1 - self.sigma) * self.p_init  # convex combination
         return self.p_cur
+
+    def reset(self):
+        """Reset the preference state"""
+        self.p_cur = self.p_init
 
 
 def normalize_simplex(p_mat: np.ndarray) -> np.ndarray:
