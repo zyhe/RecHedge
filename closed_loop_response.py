@@ -132,8 +132,8 @@ class ClosedLoopResponse:
 def main():
     np.random.seed(15)
     response_runner = ClosedLoopResponse(file_path='Config/params.yaml')
-    response_runner.execute()
-    # response_runner.profile_execution()
+    # response_runner.execute()
+    response_runner.profile_execution()
 
 
 if __name__ == "__main__":
