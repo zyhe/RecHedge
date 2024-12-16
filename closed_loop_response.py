@@ -9,6 +9,9 @@ import yaml
 import cProfile  # for profile analysis
 import pstats
 
+import warnings
+warnings.simplefilter("error", RuntimeWarning)
+
 from Models.distribution_dynamics import UserHedge
 from Solvers.vanilla import VanillaAlg
 
@@ -31,7 +34,7 @@ class ClosedLoopResponse:
 
         # parameters related to the algorithm
         self.sz = self.params['algorithm']['sz']
-        self.num_itr = self.params['algorithm']['num_itr']
+        self.num_itr = int(float(self.params['algorithm']['num_itr']))
         self.penalty_coeff = self.params['algorithm']['penalty_coeff']
         self.penalty_inc_factor = self.params['algorithm']['penalty_inc_factor']
 
@@ -87,7 +90,8 @@ class ClosedLoopResponse:
     def evaluate_perf(self, dec: np.ndarray) -> tuple[float, float]:
         """Evaluate the performance in terms of the objective and constraint satisfaction."""
         utility = (self.user.p_cur.T @ dec).item()
-        constraint_violation = max(0, self.lbd - np.sum(dec))  # if positive, then the constraint is violated
+        constraint_violation = (np.sum(dec) - self.lbd)**2
+        # constraint_violation = max(0, self.lbd - np.sum(dec))  # if positive, then the constraint is violated
         return utility, constraint_violation
 
     def _visualize(self):
@@ -132,8 +136,8 @@ class ClosedLoopResponse:
 def main():
     np.random.seed(15)
     response_runner = ClosedLoopResponse(file_path='Config/params.yaml')
-    # response_runner.execute()
-    response_runner.profile_execution()
+    response_runner.execute()
+    # response_runner.profile_execution()
 
 
 if __name__ == "__main__":

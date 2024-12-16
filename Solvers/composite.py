@@ -1,7 +1,7 @@
 """
-## vanilla algorithm
+## composite algorithm
 
-Follow the idea of performative prediction, i.e., sampling and optimize
+Use the dynamics information to construct the gradient
 
 """
 import numpy as np
@@ -11,7 +11,7 @@ from Models.distribution_dynamics import UserHedge
 from .tool_funcs import proj_box
 
 
-class VanillaAlg:
+class CompositeAlg:
     def __init__(self, sz: float):
         """
         :param sz: step size

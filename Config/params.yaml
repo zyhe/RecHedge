@@ -1,12 +1,12 @@
 dynamics:
-  sigma: 0.5  # combination coefficient in the modified hedge dynamics
+  sigma: 0.2  # combination coefficient in the modified hedge dynamics
   epsilon: 0.5  # step size in the hedge dynamics
 
 algorithm:
-  sz: !!float 5e-2  # step size
-  num_itr: 100  # total number of iterations
-  penalty_coeff: 1  # penalty coefficient
-  penalty_inc_factor: !!float 1.001  # increasing factor related to the penalty coefficient
+  sz: !!float 1e-2  # step size
+  num_itr: 5e3  # total number of iterations
+  penalty_coeff: 10  # penalty coefficient
+  penalty_inc_factor: !!float 1  # increasing factor related to the penalty coefficient
 
 problem:
   dim: 5  # dimension of the problem, i.e., size of the preference vector
