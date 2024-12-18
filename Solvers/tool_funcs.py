@@ -42,8 +42,13 @@ def proj_simplex(v: np.ndarray, bound: float = 1) -> np.ndarray:
 
 if __name__ == '__main__':
     # Example usage
-    v = np.array([0.2, 0.1, -0.1, 0.4, 0.5]).reshape(-1, 1)
-    bound = 1
+    # v = np.array([0.2, 0.1, -0.1, 0.4, 0.5]).reshape(-1, 1)
+    v = np.array([[2.16125623],
+       [0.01068014],
+       [0.86140965],
+       [1.82994352],
+       [0.23671047]])
+    bound = 5
     projected_v = proj_simplex(v, bound)
     print("Original vector:", v.T)
     print("Projected vector:", projected_v.T)
