@@ -103,7 +103,7 @@ class ClosedLoopResponse:
     def _visualize(self):
         """Plot utility and constraint violation over iterations."""
         self._plot_metric(self.utility_data, "Loss")
-        self._plot_metric(self.constraint_vio_data, "Constraint Violation")
+        # self._plot_metric(self.constraint_vio_data, "Constraint Violation")
         plt.show()
 
     def _plot_metric(self, data: np.ndarray, ylabel: str):
@@ -148,7 +148,7 @@ class ClosedLoopResponse:
 
 
 def main():
-    np.random.seed(10)
+    np.random.seed(15)
     response_runner = ClosedLoopResponse(file_path='./Config/params.yaml')
     response_runner.execute()
     # response_runner.profile_execution()

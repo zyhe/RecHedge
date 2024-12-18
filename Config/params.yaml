@@ -1,15 +1,15 @@
 dynamics:
   lambda1: 0.4  # combination coefficient in the modified hedge dynamics
-  lambda2: 0.3  # combination coefficient in the modified hedge dynamics
-  epsilon: 0.5  # step size in the hedge dynamics
+  lambda2: 0.4  # combination coefficient in the modified hedge dynamics
+  epsilon: 0.4  # step size in the hedge dynamics
 
 algorithm:
   sz: !!float 1e-1  # step size
-  num_itr: 5e3  # total number of iterations
+  num_itr: 3e3  # total number of iterations
   penalty_coeff: 10  # penalty coefficient
   penalty_inc_factor: !!float 1  # increasing factor related to the penalty coefficient
 
 problem:
   dim: 5  # dimension of the problem, i.e., size of the preference vector
   bd_dec: 5  # upper bound on the decision
-  budget: 5  # budget on the sum of elements of the decision vector
+  budget: 10  # budget on the sum of elements of the decision vector
