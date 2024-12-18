@@ -10,15 +10,17 @@ import matplotlib.pyplot as plt
 
 
 class UserHedge:
-    def __init__(self, dim: int, sigma: float, epsilon: float):
+    def __init__(self, dim: int, lambda1: float, lambda2: float, epsilon: float):
         """
         :param dim: dimension of the state, i.e., the number of choices
-        :param sigma: combination coefficient in the modified hedge dynamics
-        :param epsilon: step size in the hedge dynamics
+        :param lambda1: combination coefficient in the modified hedge dynamics
+        :param lambda2: combination coefficient in the modified hedge dynamics
+        :param epsilon: step size/coefficient in the hedge dynamics
         """
         # problem and dynamics parameters
         self.dim = dim
-        self.sigma = sigma
+        self.lambda1 = lambda1
+        self.lambda2 = lambda2
         self.epsilon = epsilon
 
         # preference state
@@ -32,10 +34,21 @@ class UserHedge:
         :param: dec: the current loss vector, which serves as the input
         :return: the preference state at the next time step
         """
-        # transient vector
-        p_trans = self.p_cur * np.exp(-self.epsilon * dec)
-        self.p_cur = self.sigma * normalize_simplex(p_trans) + (1 - self.sigma) * self.p_init  # convex combination
+        # convex combination
+        self.p_cur = (self.lambda1 * self.p_cur + self.lambda2 * self.softmax_vec(dec)
+                      + (1 - self.lambda1 - self.lambda2) * self.p_init)
         return self.p_cur
+
+    def softmax_vec(self, dec: np.ndarray) -> np.ndarray:
+        """
+        Calculate the softmax function of the given decision (i.e., loss vector)
+        :param dec: the current loss vector, which serves as the input
+        :return: a vector from the softmax function
+        """
+        max_loss = np.max(-self.epsilon * dec)
+        exp_weight = np.exp(-self.epsilon * dec - max_loss)
+        exp_weight /= np.sum(exp_weight)
+        return exp_weight
 
     def reset(self):
         """Reset the preference state"""

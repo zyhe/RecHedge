@@ -8,7 +8,7 @@ import numpy as np
 import sys
 sys.path.append("..")
 from Models.distribution_dynamics import UserHedge
-from .tool_funcs import proj_box
+from .tool_funcs import *
 
 
 class CompositeAlg:
@@ -17,17 +17,31 @@ class CompositeAlg:
         :param sz: step size
         """
         self.sz = sz
+    
+    def sens_mat(self, dec: np.ndarray, user: UserHedge) -> np.ndarray:
+        """
+        Construct the sensitivity matrix
+        :param dec: decision vector
+        :param loss: loss vector
+        :return: the Jacobian matrix
+        """
+        # Stabilize exponentials by subtracting the max value of the scaled decision
+        max_loss = np.max(-user.epsilon * dec)
+        z = np.exp(-user.epsilon * dec - max_loss)
+        sum_z = np.sum(z, axis=0)
 
-    def itr_update(self, dec_prev: np.ndarray, user: UserHedge, penalty: float, lbd: float) -> np.ndarray:
+        diag_z = np.diag(z.ravel())
+        jacobian = user.lambda2 / (1-user.lambda1) * -user.epsilon * (sum_z * diag_z - z @ z.T) / (sum_z**2)
+        return jacobian
+
+    def itr_update(self, dec: np.ndarray, user: UserHedge, budget: float) -> np.ndarray:
         """
         Implement the iterative update
-        :param dec_prev: previous decision
+        :param dec: decision vector
         :param user: object of the class UserHedge
-        :param penalty: current penalty parameter
-        :param lbd: lower upper bound on the sum of elements of dec_prev
+        # :param penalty: current penalty parameter
+        :param budget: total budget on the sum of elements of the decision
         """
-        # constr_vio = max(0, lbd - np.sum(dec_prev))
-        constr_vio = lbd - np.sum(dec_prev)
-        grad = user.p_cur - penalty * constr_vio * np.ones_like(dec_prev)
-        dec_cur = proj_box(dec_prev - self.sz * grad, np.zeros_like(dec_prev), lbd * np.ones_like(dec_prev))
+        grad = user.p_cur + self.sens_mat(dec, user) @ dec
+        dec_cur = proj_simplex(dec + self.sz * grad, budget)
         return dec_cur

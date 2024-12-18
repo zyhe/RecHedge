@@ -1,10 +1,9 @@
 """
 Analyze the closed-loop response of the user and the algorithm
-We address hedge dynamics and an equality constraint on budget
 """
 import numpy as np
 import matplotlib.pyplot as plt
-# from datetime import datetime
+from datetime import datetime
 from pathlib import Path
 import yaml
 import cProfile  # for profile analysis
@@ -15,7 +14,6 @@ warnings.simplefilter("error", RuntimeWarning)
 
 from Models.distribution_dynamics import UserHedge
 from Solvers.vanilla import VanillaAlg
-from Solvers.composite import CompositeAlg
 
 # Configure font settings
 plt.rcParams.update({
@@ -31,31 +29,28 @@ class ClosedLoopResponse:
         self.params = self._load_parameters()
 
         # parameters related to the distribution dynamics
-        self.lambda1 = self.params['dynamics']['lambda1']
-        self.lambda2 = self.params['dynamics']['lambda1']
+        self.sigma = self.params['dynamics']['sigma']
         self.epsilon = self.params['dynamics']['epsilon']
 
         # parameters related to the algorithm
         self.sz = self.params['algorithm']['sz']
         self.num_itr = int(float(self.params['algorithm']['num_itr']))
-        # self.penalty_coeff = self.params['algorithm']['penalty_coeff']
-        # self.penalty_inc_factor = self.params['algorithm']['penalty_inc_factor']
+        self.penalty_coeff = self.params['algorithm']['penalty_coeff']
+        self.penalty_inc_factor = self.params['algorithm']['penalty_inc_factor']
 
         # parameters related to the problem
         self.dim = self.params['problem']['dim']
-        # self.bd_dec = self.params['problem']['bd_dec']
-        self.budget = self.params['problem']['budget']
+        self.lbd = self.params['problem']['lbd']
 
-        # initialize the user distribution and the algorithm
-        self.user = UserHedge(self.dim, self.lambda1, self.lambda2, self.epsilon)
+        # initialize the user distribution
+        self.user = UserHedge(self.dim, self.sigma, self.epsilon)
         self.alg = None  # type of the solver
-        self.alg_name = {0: 'vanilla', 1: 'composite'}
 
         # store results
-        self.pref_data = np.zeros((2, self.dim, self.num_itr))
-        self.dec_data = np.zeros((2, self.dim, self.num_itr))
-        self.utility_data = np.zeros((2, self.num_itr))
-        self.constraint_vio_data = np.zeros((2, self.num_itr))
+        self.pref_data = np.zeros((self.dim, self.num_itr))
+        self.dec_data = np.zeros((self.dim, self.num_itr))
+        self.utility_data = np.zeros(self.num_itr)
+        self.constraint_vio_data = np.zeros(self.num_itr)
 
     def _load_parameters(self) -> dict:
         """
@@ -71,32 +66,31 @@ class ClosedLoopResponse:
         if mode == "vanilla":
             return VanillaAlg(self.sz)
         elif mode == "composite":
-            return CompositeAlg(self.sz)
+            pass
 
-    def feedback_response(self, index):
+    def feedback_response(self):
         """
         Implement the response when the algorithm is interconnected with the distribution dynamics
-        :param index: index of the problem, 0 for vanilla, and 1 for composite
         """
-        dec = self.budget / self.dim * np.ones((self.dim, 1))  # initial decision
-        # penalty_cur = self.penalty_coeff
+        dec = np.ones((self.dim, 1))  # initial decision
+        penalty_cur = self.penalty_coeff
 
         for i in range(self.num_itr):
-            # penalty_cur *= self.penalty_inc_factor
+            penalty_cur *= self.penalty_inc_factor
             p_cur = self.user.per_step_dynamics(dec)
-            dec = self.alg.itr_update(dec, self.user, self.budget)
+            dec = self.alg.itr_update(dec, self.user, penalty_cur, self.lbd)
 
             # store results
-            self.pref_data[index, :, i:i+1] = p_cur
-            self.dec_data[index, :, i:i+1] = dec
-            self.utility_data[index, i], self.constraint_vio_data[index, i] = self.evaluate_perf(dec)
+            self.pref_data[:, i:i+1] = p_cur
+            self.dec_data[:, i:i+1] = dec
+            self.utility_data[i], self.constraint_vio_data[i] = self.evaluate_perf(dec)
 
-        print(f'The {self.alg_name[index]} algorithm is finished.')
+        self._visualize()
 
     def evaluate_perf(self, dec: np.ndarray) -> tuple[float, float]:
         """Evaluate the performance in terms of the objective and constraint satisfaction."""
         utility = (self.user.p_cur.T @ dec).item()
-        constraint_violation = (np.sum(dec) - self.budget)**2
+        constraint_violation = (np.sum(dec) - self.lbd)**2
         # constraint_violation = max(0, self.lbd - np.sum(dec))  # if positive, then the constraint is violated
         return utility, constraint_violation
 
@@ -104,13 +98,11 @@ class ClosedLoopResponse:
         """Plot utility and constraint violation over iterations."""
         self._plot_metric(self.utility_data, "Loss")
         self._plot_metric(self.constraint_vio_data, "Constraint Violation")
-        plt.show()
 
     def _plot_metric(self, data: np.ndarray, ylabel: str):
         """Plot the evolution of a specific metric."""
         plt.figure()
-        plt.plot(np.arange(self.num_itr), data[0], linewidth=2, label='vanilla')
-        plt.plot(np.arange(self.num_itr), data[1], linewidth=2, label='composite')
+        plt.plot(np.arange(self.num_itr), data, linewidth=2, label='vanilla')
         plt.legend(fontsize=16, loc='lower right')
         plt.xlabel('Number of Iterations', fontsize=18)
         plt.ylabel(ylabel, fontsize=18)
@@ -120,7 +112,7 @@ class ClosedLoopResponse:
         plt.locator_params(axis='both', nbins=7)
         plt.grid(linestyle='--', color='gray')
         plt.tight_layout(pad=0)
-        plt.show(block=False)
+        plt.show()
 
     def execute(self):
         """
@@ -128,13 +120,7 @@ class ClosedLoopResponse:
         """
         # Run the vanilla algorithm
         self.alg = self._select_solver("vanilla")
-        self.feedback_response(index=0)
-
-        # Run the composite algorithm
-        self.alg = self._select_solver("composite")
-        self.feedback_response(index=1)
-
-        self._visualize()
+        self.feedback_response()
         print('Finish the program.')
 
     @staticmethod
@@ -148,8 +134,9 @@ class ClosedLoopResponse:
 
 
 def main():
-    np.random.seed(10)
-    response_runner = ClosedLoopResponse(file_path='./Config/params.yaml')
+    np.random.seed(15)
+    # to reach Config, we need to go two levels up
+    response_runner = ClosedLoopResponse(file_path='../../Config/params.yaml')
     response_runner.execute()
     # response_runner.profile_execution()
 
