@@ -38,7 +38,7 @@ class ClosedLoopResponse:
         # parameters related to the algorithm
         self.sz = self.params['algorithm']['sz']
         self.num_itr = int(float(self.params['algorithm']['num_itr']))
-        # self.penalty_coeff = self.params['algorithm']['penalty_coeff']
+        self.penalty_coeff = self.params['algorithm']['penalty_coeff']
         # self.penalty_inc_factor = self.params['algorithm']['penalty_inc_factor']
 
         # parameters related to the problem
@@ -86,7 +86,7 @@ class ClosedLoopResponse:
         for i in range(self.num_itr):
             # penalty_cur *= self.penalty_inc_factor
             p_cur = self.user.per_step_dynamics(dec)
-            dec = self.alg.itr_update(dec, self.user, self.budget)
+            dec = self.alg.itr_update(dec, self.user, self.budget, self.penalty_coeff)
 
             # store results
             self.pref_data[index, :, i:i+1] = p_cur
@@ -106,6 +106,7 @@ class ClosedLoopResponse:
         """Plot utility and constraint violation over iterations."""
         self._plot_metric(self.utility_data, "Loss")  # utility
         # self._plot_metric(self.constraint_vio_data, "Constraint Violation")  # constraint violation
+        self._semilog_metric(self.utility_data, "Loss")  # utility
         plt.show()
 
     def _plot_metric(self, data: np.ndarray, ylabel: str):
@@ -124,6 +125,21 @@ class ClosedLoopResponse:
         plt.tight_layout(pad=0)
         plt.show(block=False)
 
+    def _semilog_metric(self, data: np.ndarray, ylabel: str):
+        """Use the semilog plot."""
+        plt.figure()
+        plt.semilogy(np.arange(self.num_itr), self.user.opt_val - data[0], linewidth=2, label='vanilla')
+        plt.semilogy(np.arange(self.num_itr), self.user.opt_val - data[1], linewidth=2, label='composite')
+        plt.legend(fontsize=16, loc='lower right')
+        plt.xlabel('Number of Iterations', fontsize=18)
+        plt.ylabel(ylabel, fontsize=18)
+        plt.tick_params(axis='both', which='major', labelsize=14, direction='in', length=4, width=0.5)
+        plt.tick_params(axis='both', which='minor', labelsize=10, direction='in', length=2, width=0.5)  # Minor ticks
+        plt.minorticks_on()
+        plt.grid(linestyle='--', color='gray')
+        plt.tight_layout(pad=0)
+        plt.show(block=False)
+
     def execute(self):
         """
         Executes full closed-loop responses with different algorithms.
@@ -136,7 +152,7 @@ class ClosedLoopResponse:
         self.alg = self._select_solver("composite")
         self.feedback_response(index=1)
 
-        print(f'The utility obtained by the naive solution is {self.user.naive_dec_utility()}')
+        # print(f'The utility obtained by the naive solution is {self.user.naive_dec_utility()}')
 
         self._visualize()
         print('Finish the program.')
@@ -152,7 +168,7 @@ class ClosedLoopResponse:
 
 
 def main():
-    np.random.seed(5)
+    np.random.seed(10)
     response_runner = ClosedLoopResponse(file_path='./Config/params.yaml')
     response_runner.execute()
     # response_runner.profile_execution()

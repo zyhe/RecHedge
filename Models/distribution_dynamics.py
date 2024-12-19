@@ -7,7 +7,8 @@ A user following distribution dynamics with a modified hedge structure
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+from scipy.optimize import minimize
+from cyipopt import minimize_ipopt
 
 class UserHedge:
     def __init__(self, dim: int, lambda1: float, lambda2: float, epsilon: float, budget: float):
@@ -29,6 +30,10 @@ class UserHedge:
         # self.p_init = normalize_simplex(np.ones((dim, 1)))  # uniform initial distribution
         self.p_init = normalize_simplex(np.random.rand(dim, 1))
         self.p_cur = self.p_init
+
+        # calculate the optimal solution via feedforward numerical optimization
+        self.opt_pt, self.opt_val = self.maximize_obj_scipy()
+        pass
 
     def per_step_dynamics(self, dec: np.ndarray) -> np.ndarray:
         """
@@ -66,11 +71,45 @@ class UserHedge:
     def naive_dec_utility(self) -> np.ndarray:
         """
         Evaluate the steady-state utility corresponding to the naive decision
-        :return:
+        :return: steady-state utility of the naive decision
         """
         # Use a greedy decision, i.e., allocating all the budget to the most probable element
         dec_naive = self.budget * (self.p_init == np.max(self.p_init)).astype(int)
         return self.steady_state(dec_naive).T @ dec_naive
+
+    def objective_function(self, dec: np.ndarray) -> float:
+        dec = dec.reshape(-1, 1)
+        steady_state = self.steady_state(dec)
+        return -steady_state.T @ dec  # Negative because we are maximizing
+
+    def constraint_sum(self, dec: np.ndarray) -> float:
+        return np.sum(dec) - self.budget
+
+    def maximize_obj_scipy(self):
+        """
+        Optimize the objective function (i.e., the inner product) through scipy
+        :return: optimal decision and optimal value
+        """
+        # Initial guess
+        x0 = np.ones(self.dim) * self.budget / self.dim
+
+        # Constraints
+        constraints = {'type': 'eq', 'fun': self.constraint_sum}
+
+        # Bounds for decision variables
+        bounds = [(0, None) for _ in range(self.dim)]
+
+        # Optimize
+        result = minimize(self.objective_function, x0, method='SLSQP', bounds=bounds, constraints=constraints)
+
+        if result.success:
+            optimal_dec = result.x
+            optimal_value = -result.fun  # Negate to get the original objective value
+            print(f'The optimal decision is {optimal_dec} with the optimal value {optimal_value}.')
+            return optimal_dec.reshape(-1, 1), optimal_value
+        else:
+            print("Optimization failed.")
+            return None, None
 
     def reset(self):
         """Reset the preference state"""

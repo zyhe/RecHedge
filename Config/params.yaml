@@ -6,7 +6,7 @@ dynamics:
 algorithm:
   sz: !!float 1e-1  # step size
   num_itr: 3e3  # total number of iterations
-  penalty_coeff: 10  # penalty coefficient
+  penalty_coeff: 2  # penalty coefficient
   penalty_inc_factor: !!float 1  # increasing factor related to the penalty coefficient
 
 problem:

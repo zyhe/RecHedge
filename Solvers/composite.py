@@ -34,14 +34,16 @@ class CompositeAlg:
         jacobian = user.lambda2 / (1-user.lambda1) * -user.epsilon * (sum_z * diag_z - z @ z.T) / (sum_z**2)
         return jacobian
 
-    def itr_update(self, dec: np.ndarray, user: UserHedge, budget: float) -> np.ndarray:
+    def itr_update(self, dec: np.ndarray, user: UserHedge, budget: float, penalty_coeff: float) -> np.ndarray:
         """
         Implement the iterative update
         :param dec: decision vector
         :param user: object of the class UserHedge
-        # :param penalty: current penalty parameter
         :param budget: total budget on the sum of elements of the decision
+        :param penalty: penalty parameter
         """
+        # grad = -user.p_cur - self.sens_mat(dec, user) @ dec + penalty_coeff * dec
+
         grad = user.p_cur + self.sens_mat(dec, user) @ dec
         dec_cur = proj_simplex(dec + self.sz * grad, budget)
         return dec_cur
