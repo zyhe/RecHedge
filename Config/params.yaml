@@ -1,6 +1,6 @@
 dynamics:
-  lambda1: 0.4  # combination coefficient in the modified hedge dynamics
-  lambda2: 0.4  # combination coefficient in the modified hedge dynamics
+  lambda1: 0.2  # combination coefficient in the modified hedge dynamics
+  lambda2: 0.6  # combination coefficient in the modified hedge dynamics
   epsilon: 0.4  # step size in the hedge dynamics
 
 algorithm:

@@ -47,7 +47,7 @@ class ClosedLoopResponse:
         self.budget = self.params['problem']['budget']
 
         # initialize the user distribution and the algorithm
-        self.user = UserHedge(self.dim, self.lambda1, self.lambda2, self.epsilon)
+        self.user = UserHedge(self.dim, self.lambda1, self.lambda2, self.epsilon, self.budget)
         self.alg = None  # type of the solver
         self.alg_name = {0: 'vanilla', 1: 'composite'}
 
@@ -78,7 +78,9 @@ class ClosedLoopResponse:
         Implement the response when the algorithm is interconnected with the distribution dynamics
         :param index: index of the problem, 0 for vanilla, and 1 for composite
         """
-        dec = self.budget / self.dim * np.ones((self.dim, 1))  # initial decision
+        # initial decision
+        dec = self.budget / self.dim * np.ones((self.dim, 1))  # equal weight to each element
+        # dec = self.budget * (self.user.p_init == np.max(self.user.p_init)).astype(int)  # greedy initial decision
         # penalty_cur = self.penalty_coeff
 
         for i in range(self.num_itr):
@@ -102,8 +104,8 @@ class ClosedLoopResponse:
 
     def _visualize(self):
         """Plot utility and constraint violation over iterations."""
-        self._plot_metric(self.utility_data, "Loss")
-        # self._plot_metric(self.constraint_vio_data, "Constraint Violation")
+        self._plot_metric(self.utility_data, "Loss")  # utility
+        # self._plot_metric(self.constraint_vio_data, "Constraint Violation")  # constraint violation
         plt.show()
 
     def _plot_metric(self, data: np.ndarray, ylabel: str):
@@ -134,6 +136,8 @@ class ClosedLoopResponse:
         self.alg = self._select_solver("composite")
         self.feedback_response(index=1)
 
+        print(f'The utility obtained by the naive solution is {self.user.naive_dec_utility()}')
+
         self._visualize()
         print('Finish the program.')
 
@@ -148,7 +152,7 @@ class ClosedLoopResponse:
 
 
 def main():
-    np.random.seed(15)
+    np.random.seed(5)
     response_runner = ClosedLoopResponse(file_path='./Config/params.yaml')
     response_runner.execute()
     # response_runner.profile_execution()
