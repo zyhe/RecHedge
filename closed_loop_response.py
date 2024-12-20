@@ -9,6 +9,7 @@ from pathlib import Path
 import yaml
 import cProfile  # for profile analysis
 import pstats
+from scipy.stats import wasserstein_distance
 
 import warnings
 warnings.simplefilter("error", RuntimeWarning)
@@ -51,11 +52,16 @@ class ClosedLoopResponse:
         self.alg = None  # type of the solver
         self.alg_name = {0: 'vanilla', 1: 'composite'}
 
+        # value array used in calculating Wasserstein distances
+        self.ele_val = np.arange(10, 10+self.dim*10, 10)
+
         # store results
-        self.pref_data = np.zeros((2, self.dim, self.num_itr))
-        self.dec_data = np.zeros((2, self.dim, self.num_itr))
-        self.utility_data = np.zeros((2, self.num_itr))
-        self.constraint_vio_data = np.zeros((2, self.num_itr))
+        self.pref_data = np.zeros((2, self.dim, self.num_itr))  # preference state
+        self.dec_data = np.zeros((2, self.dim, self.num_itr))  # decision
+        self.utility_data = np.zeros((2, self.num_itr))  # utility
+        self.constraint_vio_data = np.zeros((2, self.num_itr))  # constraint violation
+        self.dist_opt_pt_data = np.zeros((2, self.num_itr))  # distance to the optimal point
+        self.dist_wasserstein = np.zeros((2, self.num_itr))  # Wasserstein distance
 
     def _load_parameters(self) -> dict:
         """
@@ -93,28 +99,37 @@ class ClosedLoopResponse:
             self.dec_data[index, :, i:i+1] = dec
             self.utility_data[index, i], self.constraint_vio_data[index, i] = self.evaluate_perf(dec)
 
+            # calculate the Wasserstein distance relative to the steady-state distribution
+            p_ss = self.user.steady_state(dec)  # steady state
+            self.dist_wasserstein[index, i] = wasserstein_distance(self.ele_val, self.ele_val,
+                                                                   p_cur.flatten(), p_ss.flatten())
+
+        # calculate the distance to the optimal point
+        self.dist_opt_pt_data[index] = np.linalg.norm(self.dec_data[index] - self.user.opt_pt, axis=0)
+
         print(f'The {self.alg_name[index]} algorithm is finished.')
 
     def evaluate_perf(self, dec: np.ndarray) -> tuple[float, float]:
         """Evaluate the performance in terms of the objective and constraint satisfaction."""
         utility = (self.user.p_cur.T @ dec).item()
         constraint_violation = (np.sum(dec) - self.budget)**2
-        # constraint_violation = max(0, self.lbd - np.sum(dec))  # if positive, then the constraint is violated
         return utility, constraint_violation
 
     def _visualize(self):
         """Plot utility and constraint violation over iterations."""
         self._plot_metric(self.utility_data, "Loss")  # utility
         # self._plot_metric(self.constraint_vio_data, "Constraint Violation")  # constraint violation
-        self._semilog_metric(self.utility_data, "Loss")  # utility
+        self._semilog_metric(self.user.opt_val - self.utility_data, "Optimality gap")  # gap relative to the optimal utility
+        self._plot_metric(self.dist_opt_pt_data, "Distance to $l^*$")  # gap relative to the optimal utility
+        self._semilog_metric(self.dist_wasserstein, "Wasserstein distance")  # Wasserstein distance
         plt.show()
 
     def _plot_metric(self, data: np.ndarray, ylabel: str):
         """Plot the evolution of a specific metric."""
         plt.figure()
-        plt.plot(np.arange(self.num_itr), data[0], linewidth=2, label='vanilla')
-        plt.plot(np.arange(self.num_itr), data[1], linewidth=2, label='composite')
-        plt.legend(fontsize=16, loc='lower right')
+        plt.plot(np.arange(self.num_itr), data[0], linewidth=2.5, label='vanilla')
+        plt.plot(np.arange(self.num_itr), data[1], linewidth=2.5, label='composite')
+        plt.legend(fontsize=16, loc='upper right')
         plt.xlabel('Number of Iterations', fontsize=18)
         plt.ylabel(ylabel, fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=14, direction='in', length=4, width=0.5)
@@ -128,9 +143,9 @@ class ClosedLoopResponse:
     def _semilog_metric(self, data: np.ndarray, ylabel: str):
         """Use the semilog plot."""
         plt.figure()
-        plt.semilogy(np.arange(self.num_itr), self.user.opt_val - data[0], linewidth=2, label='vanilla')
-        plt.semilogy(np.arange(self.num_itr), self.user.opt_val - data[1], linewidth=2, label='composite')
-        plt.legend(fontsize=16, loc='lower right')
+        plt.semilogy(np.arange(self.num_itr), data[0], linewidth=2.5, label='vanilla')
+        plt.semilogy(np.arange(self.num_itr), data[1], linewidth=2.5, label='composite')
+        plt.legend(fontsize=16, loc='upper right')
         plt.xlabel('Number of Iterations', fontsize=18)
         plt.ylabel(ylabel, fontsize=18)
         plt.tick_params(axis='both', which='major', labelsize=14, direction='in', length=4, width=0.5)
@@ -168,7 +183,7 @@ class ClosedLoopResponse:
 
 
 def main():
-    np.random.seed(10)
+    np.random.seed(20)
     response_runner = ClosedLoopResponse(file_path='./Config/params.yaml')
     response_runner.execute()
     # response_runner.profile_execution()

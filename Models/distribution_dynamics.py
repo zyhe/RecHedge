@@ -9,6 +9,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize
 from cyipopt import minimize_ipopt
+# from autograd import grad
+# import jax
+# import jax.numpy as jnp
 
 class UserHedge:
     def __init__(self, dim: int, lambda1: float, lambda2: float, epsilon: float, budget: float):
@@ -32,8 +35,12 @@ class UserHedge:
         self.p_cur = self.p_init
 
         # calculate the optimal solution via feedforward numerical optimization
-        self.opt_pt, self.opt_val = self.maximize_obj_scipy()
-        pass
+        # Initial guess
+        x0 = np.ones(self.dim) * self.budget / self.dim  # uniform vector
+        # x0 = self.budget * (self.p_init == np.max(self.p_init)).astype(int).flatten()  # greedy initial decision
+        # x0 = self.budget * normalize_simplex(np.random.rand(dim))  # random initial decision
+        # self.opt_pt, self.opt_val = self.maximize_obj(x0, solver='scipy')
+        self.opt_pt, self.opt_val = self.maximize_obj(x0, solver='ipopt')
 
     def per_step_dynamics(self, dec: np.ndarray) -> np.ndarray:
         """
@@ -61,7 +68,7 @@ class UserHedge:
     def steady_state(self, dec: np.ndarray) -> np.ndarray:
         """
         Calculate the steady-state preference state corresponding to the given decision
-        :param dec:
+        :param dec: decision vector
         :return: steady-state preference state
         """
         p_ss = ((self.lambda2 * self.softmax_vec(dec) + (1 - self.lambda1 - self.lambda2) * self.p_init)
@@ -78,21 +85,26 @@ class UserHedge:
         return self.steady_state(dec_naive).T @ dec_naive
 
     def objective_function(self, dec: np.ndarray) -> float:
+        """The objective function used by optimization solvers"""
         dec = dec.reshape(-1, 1)
         steady_state = self.steady_state(dec)
-        return -steady_state.T @ dec  # Negative because we are maximizing
+        return (-steady_state.T @ dec).item()  # Negative because we are maximizing; return a scalar
 
     def constraint_sum(self, dec: np.ndarray) -> float:
+        """The constraint function used by optimization solvers"""
         return np.sum(dec) - self.budget
+    
+    # def gradient_obj(self, dec: np.ndarray) -> np.ndarray:
+    #     grad_func = grad(self.objective_function)
+    #     return grad_func(dec)
 
-    def maximize_obj_scipy(self):
+    def maximize_obj(self, x0, solver):
         """
-        Optimize the objective function (i.e., the inner product) through scipy
+        Optimize the objective function (i.e., the inner product) through scipy or IPOPT
+        :param x0: initial guess
+        :param solver: the solver to use, either 'scipy' or 'ipopt'
         :return: optimal decision and optimal value
         """
-        # Initial guess
-        x0 = np.ones(self.dim) * self.budget / self.dim
-
         # Constraints
         constraints = {'type': 'eq', 'fun': self.constraint_sum}
 
@@ -100,7 +112,15 @@ class UserHedge:
         bounds = [(0, None) for _ in range(self.dim)]
 
         # Optimize
-        result = minimize(self.objective_function, x0, method='SLSQP', bounds=bounds, constraints=constraints)
+        if solver == 'scipy':
+            result = minimize(self.objective_function, x0, method='SLSQP', bounds=bounds, constraints=constraints)
+        else:
+            # Use IPOPT
+            result = minimize_ipopt(self.objective_function, x0, bounds=bounds, constraints=constraints,
+                                    options={'acceptable_tol': 1e-7, 'tol': 1e-8})
+            # Manually set success to True if acceptable tolerance was reached
+            if result.status == 1:  # Status 1 indicates acceptable tolerance reached
+                result.success = True
 
         if result.success:
             optimal_dec = result.x
